@@ -1,0 +1,252 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PipelineJudge Eval Suite Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# This YAML file is the design artifact showing how a PM configures evaluations
+# without writing Python. The framework parses this file and executes accordingly.
+#
+# In the MVP, this config is hardcoded as a Python dict (eval_config.py).
+# In v2, the framework will parse this YAML at runtime.
+# ─────────────────────────────────────────────────────────────────────────────
+
+suite:
+  name: enterprise_rag_v1
+  version: "1.0"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LAYER 1: PRODUCT EVALS
+# ═══════════════════════════════════════════════════════════════════════════════
+# These dimensions measure PRODUCT OUTCOMES, not model metrics.
+# No other eval framework offers these dimensions.
+
+product:
+  weight: 0.35
+  dimensions:
+
+    TCF:
+      name: Task Completion Fidelity
+      description: "Did users achieve their goal end-to-end?"
+      weight: 0.40
+      subdimensions:
+        intent_capture:
+          judge_type: llm
+          weight: 0.35
+          prompt: |
+            You are evaluating whether an AI system correctly understood the user's intent.
+
+            User query: {query}
+            System's parsed intent/reformulation: {agent_output}
+
+            Score on this rubric:
+            1 - Completely misunderstood the query
+            2 - Captured the general topic but missed key specifics
+            3 - Captured the main intent but missed secondary interpretations
+            4 - Correctly captured the primary intent with relevant details
+            5 - Perfectly captured all aspects including ambiguity and edge cases
+
+            Respond ONLY with JSON: {"score": <1-5>, "reasoning": "<explanation>"}
+
+        execution_correctness:
+          judge_type: llm
+          weight: 0.35
+          prompt: |
+            You are evaluating whether an AI pipeline executed the correct operations.
+
+            User query: {query}
+            Retrieved documents: {retrieval_output}
+            Generated answer: {synthesis_output}
+
+            Score 1 (wrong docs, irrelevant answer) to 5 (excellent retrieval, accurate answer).
+            Respond ONLY with JSON: {"score": <1-5>, "reasoning": "<explanation>"}
+
+        goal_achievement:
+          judge_type: llm
+          weight: 0.30
+          prompt: |
+            You are evaluating whether a user could accomplish their goal based on this AI response.
+
+            User query: {query}
+            Final answer provided: {final_answer}
+
+            Score 1 (unable to act) to 5 (can immediately act with full confidence).
+            Respond ONLY with JSON: {"score": <1-5>, "reasoning": "<explanation>"}
+
+    DQS:
+      name: Decision Quality
+      description: "Were recommendations relevant and actionable?"
+      weight: 0.35
+      subdimensions:
+        relevance:
+          judge_type: programmatic
+          function: retrieval_relevance
+          weight: 0.35
+
+        ranking_precision:
+          judge_type: programmatic
+          function: ranking_precision
+          weight: 0.30
+
+        actionability:
+          judge_type: llm
+          weight: 0.35
+          prompt: |
+            You are evaluating the actionability of an AI-generated answer.
+
+            User query: {query}
+            Answer: {final_answer}
+
+            Actionability means: can the user DO something with this answer without
+            needing additional research or clarification?
+
+            Score 1 (vague, generic) to 5 (precise, step-by-step actionable guidance).
+            Respond ONLY with JSON: {"score": <1-5>, "reasoning": "<explanation>"}
+
+    EOA:
+      name: Explanation Alignment
+      description: "Does the stated reasoning match what the system did?"
+      weight: 0.25
+      subdimensions:
+        logical_consistency:
+          judge_type: llm
+          weight: 0.55
+          prompt: |
+            You are evaluating whether an AI's answer is logically consistent with its sources.
+
+            Source documents: {retrieval_output}
+            Answer generated: {synthesis_output}
+
+            Does every claim logically follow from the sources? Flag claims that go beyond sources.
+            Score 1 (multiple unsupported claims) to 5 (every claim traceable to sources).
+            Respond ONLY with JSON: {"score": <1-5>, "reasoning": "<explanation>", "unsupported_claims": ["..."]}
+
+        completeness:
+          judge_type: llm
+          weight: 0.45
+          prompt: |
+            Does the answer cite all the sources it drew from? Are there uncited claims?
+
+            Citations listed: {citations}
+            Answer: {synthesis_output}
+            Sources: {retrieval_output}
+
+            Score 1 (citations missing) to 5 (every claim properly attributed).
+            Respond ONLY with JSON: {"score": <1-5>, "reasoning": "<explanation>"}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LAYER 2: PIPELINE EVALS
+# ═══════════════════════════════════════════════════════════════════════════════
+# These dimensions evaluate multi-agent pipeline health.
+# Chain Attribution and Handoff Integrity are unique to PipelineJudge.
+
+pipeline:
+  weight: 0.40
+  dimensions:
+
+    PAQS:
+      name: Per-Agent Quality
+      description: "Individual agent performance across role-specific rubrics"
+      weight: 0.35
+      agent_rubrics:
+        analysis:
+          subdimensions:
+            intent_capture: { judge_type: llm, weight: 0.4 }
+            reformulation_quality: { judge_type: llm, weight: 0.3 }
+            filter_accuracy: { judge_type: llm, weight: 0.3 }
+        retrieval:
+          subdimensions:
+            source_authority: { judge_type: programmatic, function: source_authority, weight: 0.25 }
+            recency: { judge_type: programmatic, function: source_recency, weight: 0.25 }
+            coverage: { judge_type: programmatic, function: retrieval_coverage, weight: 0.30 }
+            diversity: { judge_type: programmatic, function: retrieval_diversity, weight: 0.20 }
+        synthesis:
+          subdimensions:
+            info_preservation: { judge_type: llm, weight: 0.30 }
+            faithfulness: { judge_type: llm, weight: 0.35 }
+            coherence: { judge_type: llm, weight: 0.15 }
+            actionability: { judge_type: llm, weight: 0.20 }
+        adversarial:
+          subdimensions:
+            critique_specificity: { judge_type: llm, weight: 0.35 }
+            weakness_coverage: { judge_type: llm, weight: 0.40 }
+            constructiveness: { judge_type: llm, weight: 0.25 }
+
+    CAS:
+      name: Chain Attribution
+      description: "Quality impact per agent — which one broke the pipeline?"
+      weight: 0.35
+      # Computed by chain attribution engine, not individual judges.
+      # Produces: waterfall chart data, bottleneck identification, attribution weights.
+
+    HIS:
+      name: Handoff Integrity
+      description: "Information preserved at agent-to-agent boundaries"
+      weight: 0.30
+      # Score = minimum HIS across all handoffs (weakest link).
+      subdimensions:
+        entity_preservation: { judge_type: programmatic, function: entity_preservation, weight: 0.40 }
+        context_compression: { judge_type: llm, weight: 0.35 }
+        instruction_fidelity: { judge_type: llm, weight: 0.25 }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LAYER 3: COMPLIANCE EVALS
+# ═══════════════════════════════════════════════════════════════════════════════
+# These dimensions evaluate regulatory and safety compliance.
+# Integrated into the same scoring framework as quality — not a separate tool.
+# COMPLIANCE FLOOR RULE: if compliance < 70, overall score capped at 50.
+
+compliance:
+  weight: 0.25
+  floor_threshold: 70
+  floor_cap: 50
+  dimensions:
+
+    PES:
+      name: PII Exposure
+      description: "Personal data detected across all pipeline stages and channels"
+      weight: 0.40
+      subdimensions:
+        detection_coverage:
+          judge_type: programmatic
+          function: pii_scan
+          weight: 0.60
+          config:
+            pii_categories: [PERSON, EMAIL, PHONE, GOV_ID, CREDIT_CARD]
+            scan_targets: [input_payload, output_payload, handoff_payload]
+        leakage_channels:
+          judge_type: programmatic
+          function: pii_channel_scan
+          weight: 0.40
+
+    ATC:
+      name: Audit Trail Completeness
+      description: "Every AI decision is reconstructable with full provenance"
+      weight: 0.30
+      subdimensions:
+        input_traceability: { judge_type: programmatic, function: input_traceability, weight: 0.30 }
+        model_version_pinning: { judge_type: programmatic, function: model_version_check, weight: 0.30 }
+        prompt_hash_present: { judge_type: programmatic, function: prompt_hash_check, weight: 0.20 }
+        timestamp_integrity: { judge_type: programmatic, function: timestamp_check, weight: 0.20 }
+
+    RRC:
+      name: Regulatory Rules
+      description: "Compliance with configured domain-specific regulatory checks"
+      weight: 0.30
+      rules:
+        - name: "GDPR — Data residency disclosure"
+          trigger: [data residen, where is data stored, geographic, eu customer, gdpr]
+          required_content: [region, US, EU]
+          severity: critical
+
+        - name: "Financial — Risk disclaimer required"
+          trigger: [pricing, cost, refund, credit, financial, penalt]
+          required_content: [terms, conditions, policy]
+          severity: critical
+
+        - name: "HR — Employee PII redaction"
+          trigger: [employee, hr, leave, personnel, staff]
+          check_type: pii_absent  # checks that personal PII is NOT in the answer
+          severity: critical
+
+        - name: "General — Source attribution required"
+          trigger: []  # always triggered
+          check_type: has_citations
+          severity: warning

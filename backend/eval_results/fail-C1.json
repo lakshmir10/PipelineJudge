@@ -1,0 +1,324 @@
+{
+  "pipeline": {
+    "name": "Nexus Cloud RAG Pipeline",
+    "version": "1.2.0",
+    "run_id": "1498bf80-8135-40ce-8785-24d8a5995990"
+  },
+  "system": {
+    "overall": 68.8,
+    "product": 71.8,
+    "pipeline": 64.4,
+    "compliance": 71.7,
+    "compliance_capped": false
+  },
+  "layers": {
+    "product": {
+      "score": 71.8,
+      "weight": 0.35,
+      "dimensions": [
+        {
+          "code": "TCF",
+          "name": "Task Completion Fidelity",
+          "score": 66.2,
+          "description": "Did users achieve their goal end-to-end?",
+          "subs": [
+            {
+              "name": "Intent Capture",
+              "score": 50.0
+            },
+            {
+              "name": "Execution Correctness",
+              "score": 75.0
+            },
+            {
+              "name": "Goal Achievement",
+              "score": 75.0
+            }
+          ]
+        },
+        {
+          "code": "DQS",
+          "name": "Decision Quality",
+          "score": 75.8,
+          "description": "Were recommendations relevant and actionable?",
+          "subs": [
+            {
+              "name": "Relevance",
+              "score": 56
+            },
+            {
+              "name": "Ranking Precision",
+              "score": 100
+            },
+            {
+              "name": "Actionability",
+              "score": 75.0
+            }
+          ]
+        },
+        {
+          "code": "EOA",
+          "name": "Explanation Alignment",
+          "score": 75.0,
+          "description": "Does the stated reasoning match what the system did?",
+          "subs": [
+            {
+              "name": "Logical Consistency",
+              "score": 75.0
+            },
+            {
+              "name": "Completeness",
+              "score": 75.0
+            }
+          ]
+        }
+      ]
+    },
+    "pipeline": {
+      "score": 64.4,
+      "weight": 0.4,
+      "dimensions": [
+        {
+          "code": "PAQS",
+          "name": "Per-Agent Quality",
+          "score": 49.2,
+          "description": "Individual agent performance across role-specific rubrics",
+          "subs": []
+        },
+        {
+          "code": "CAS",
+          "name": "Chain Attribution",
+          "score": 83,
+          "description": "Quality impact per agent \u2014 which one broke the pipeline?",
+          "subs": []
+        },
+        {
+          "code": "HIS",
+          "name": "Handoff Integrity",
+          "score": 60.6,
+          "description": "Information preserved at agent-to-agent boundaries",
+          "subs": []
+        }
+      ]
+    },
+    "compliance": {
+      "score": 71.7,
+      "weight": 0.25,
+      "dimensions": [
+        {
+          "code": "PES",
+          "name": "PII Exposure",
+          "score": 78.4,
+          "description": "Personal data detected across all pipeline stages and channels",
+          "subs": [
+            {
+              "name": "Detection Coverage",
+              "score": 70
+            },
+            {
+              "name": "Leakage Channels",
+              "score": 91
+            }
+          ]
+        },
+        {
+          "code": "ATC",
+          "name": "Audit Trail Completeness",
+          "score": 77.5,
+          "description": "Every AI decision is reconstructable with full provenance",
+          "subs": [
+            {
+              "name": "Input Traceability",
+              "score": 100
+            },
+            {
+              "name": "Model Version Pinning",
+              "score": 25
+            },
+            {
+              "name": "Prompt Hash Present",
+              "score": 100
+            },
+            {
+              "name": "Timestamp Integrity",
+              "score": 100
+            }
+          ]
+        },
+        {
+          "code": "RRC",
+          "name": "Regulatory Rules",
+          "score": 57,
+          "description": "Compliance with configured domain-specific regulatory checks",
+          "subs": []
+        }
+      ]
+    }
+  },
+  "agents": [
+    {
+      "name": "Query Analyst",
+      "type": "analysis",
+      "paqs": 50.0,
+      "attribution": 0.222,
+      "subs": {
+        "intent_capture": 50.0,
+        "reformulation_quality": 50.0,
+        "filter_accuracy": 50.0
+      },
+      "input_quality": 65,
+      "output_quality": 75
+    },
+    {
+      "name": "Retrieval",
+      "type": "retrieval",
+      "paqs": 86.0,
+      "attribution": 0.067,
+      "subs": {
+        "source_authority": 90,
+        "recency": 100,
+        "coverage": 75,
+        "diversity": 80
+      },
+      "input_quality": 75,
+      "output_quality": 78
+    },
+    {
+      "name": "Synthesis",
+      "type": "synthesis",
+      "paqs": 36.0,
+      "attribution": -0.378,
+      "subs": {
+        "info_preservation": 25.0,
+        "faithfulness": 25.0,
+        "coherence": 25.0,
+        "actionability": 80.0
+      },
+      "input_quality": 70,
+      "output_quality": 53
+    },
+    {
+      "name": "Verification",
+      "type": "adversarial",
+      "paqs": 25.0,
+      "attribution": 0.333,
+      "subs": {
+        "critique_specificity": 25.0,
+        "weakness_coverage": 25.0,
+        "constructiveness": 25.0
+      },
+      "input_quality": 70,
+      "output_quality": 85
+    }
+  ],
+  "handoffs": [
+    {
+      "from": "Query Analyst",
+      "to": "Retrieval",
+      "his": 65.4,
+      "subs": {
+        "Entity Preservation": 80,
+        "Context Compression": 77.5,
+        "Instruction Fidelity": 25.0
+      }
+    },
+    {
+      "from": "Retrieval",
+      "to": "Synthesis",
+      "his": 63.8,
+      "subs": {
+        "Entity Preservation": 100,
+        "Context Compression": 50.0,
+        "Instruction Fidelity": 25.0
+      }
+    },
+    {
+      "from": "Synthesis",
+      "to": "Verification",
+      "his": 60.6,
+      "subs": {
+        "Entity Preservation": 92,
+        "Context Compression": 50.0,
+        "Instruction Fidelity": 25.0
+      }
+    }
+  ],
+  "compliance_detail": {
+    "pii_findings": [
+      {
+        "entity": "Data Processing",
+        "type": "PERSON",
+        "location": "Synthesis \u2192 input",
+        "severity": "high"
+      },
+      {
+        "entity": "Agreement Summary",
+        "type": "PERSON",
+        "location": "Synthesis \u2192 input",
+        "severity": "high"
+      }
+    ],
+    "audit_checks": [
+      {
+        "name": "Input Traceability",
+        "passed": 4,
+        "total": 4
+      },
+      {
+        "name": "Model Version Pinning",
+        "passed": 1,
+        "total": 4
+      },
+      {
+        "name": "Prompt Hash Present",
+        "passed": 0,
+        "total": 0
+      },
+      {
+        "name": "Timestamp Integrity",
+        "passed": 4,
+        "total": 4
+      }
+    ],
+    "rule_results": [
+      {
+        "rule": "GDPR \u2014 Data residency disclosure",
+        "triggered": false,
+        "satisfied": true,
+        "severity": "critical"
+      },
+      {
+        "rule": "Financial \u2014 Risk disclaimer required",
+        "triggered": true,
+        "satisfied": false,
+        "severity": "critical"
+      },
+      {
+        "rule": "HR \u2014 Employee PII redaction",
+        "triggered": true,
+        "satisfied": true,
+        "severity": "critical"
+      },
+      {
+        "rule": "General \u2014 Source attribution required",
+        "triggered": true,
+        "satisfied": true,
+        "severity": "warning"
+      }
+    ]
+  },
+  "eval_meta": {
+    "suite": "enterprise_rag_v1",
+    "duration_sec": 0.0,
+    "tasks": 30,
+    "llm_calls": 30,
+    "cost_usd": 0.0,
+    "timestamp": "2026-04-09T11:15:42.014788",
+    "judge_config": {
+      "default_model": "claude-haiku-4-5-20251001",
+      "overrides": {},
+      "use_mock": true,
+      "has_api_key": false
+    }
+  }
+}
