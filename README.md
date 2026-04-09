@@ -19,7 +19,7 @@ Three capabilities no other eval framework offers together.
 ### Run the Demo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/pipelinejudge
+git clone https://github.com/lakshmir10/PipelineJudge
 cd pipelinejudge
 
 pip install fastapi uvicorn sqlalchemy pydantic pyyaml httpx
