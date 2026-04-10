@@ -74,6 +74,40 @@ async def trigger_eval(request: EvalRunRequest, db: Session = Depends(get_db)):
         result["eval_meta"]["model_overrides"] = request.model_overrides or {}
         result["eval_meta"]["use_mock"] = request.use_mock if request.use_mock is not None else "auto"
 
+        # ── Persist result so dashboard can find it ──
+        try:
+            os.makedirs(RESULTS_DIR, exist_ok=True)
+            query_id = request.run_id[:8]
+            # Save the result JSON
+            result_path = os.path.join(RESULTS_DIR, f"{query_id}.json")
+            with open(result_path, "w") as f:
+                json.dump(result, f)
+            # Update index
+            index_path = os.path.join(RESULTS_DIR, "index.json")
+            index = []
+            if os.path.exists(index_path):
+                with open(index_path) as f:
+                    index = json.load(f)
+            # Remove existing entry with same query_id
+            index = [e for e in index if e.get("query_id") != query_id]
+            # Build query string from run metadata
+            run_meta = result.get("pipeline", {})
+            query_str = ""
+            if result.get("pipeline", {}).get("name"):
+                query_str = result["pipeline"]["name"]
+            index.append({
+                "query_id": query_id,
+                "run_id": request.run_id,
+                "query": query_str,
+                "failure_mode": None,
+                "overall": result.get("system", {}).get("overall", 0),
+                "compliance_capped": result.get("system", {}).get("compliance_capped", False),
+            })
+            with open(index_path, "w") as f:
+                json.dump(index, f)
+        except Exception:
+            pass  # Don't fail the request if save fails
+
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
