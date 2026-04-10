@@ -132,7 +132,35 @@ def list_runs(limit: int = 20, db: Session = Depends(get_db)):
         })
 
     return results
+@router.delete("/runs/{run_id}")
+def delete_run(run_id: str, db: Session = Depends(get_db)):
+    """Delete a pipeline run and all associated data."""
+    run = db.query(PipelineRun).filter(PipelineRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
 
+    # Delete handoffs, executions, eval data
+    db.query(HandoffEvent).filter(HandoffEvent.run_id == run_id).delete()
+    db.query(AgentExecution).filter(AgentExecution.run_id == run_id).delete()
+    db.query(PipelineRun).filter(PipelineRun.id == run_id).delete()
+    db.commit()
+
+    # Also remove from eval_results if saved
+    import os, json
+    results_dir = os.path.join(os.path.dirname(__file__), "..", "..", "eval_results")
+    query_id = run_id[:8]
+    result_file = os.path.join(results_dir, f"{query_id}.json")
+    if os.path.exists(result_file):
+        os.remove(result_file)
+    index_path = os.path.join(results_dir, "index.json")
+    if os.path.exists(index_path):
+        with open(index_path) as f:
+            index = json.load(f)
+        index = [e for e in index if e.get("query_id") != query_id]
+        with open(index_path, "w") as f:
+            json.dump(index, f)
+
+    return {"status": "deleted", "run_id": run_id}
 
 @router.get("/runs/{run_id}")
 def get_run(run_id: str, db: Session = Depends(get_db)):
